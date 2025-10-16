@@ -1,0 +1,29 @@
+{
+  "name": "device-catalogue-service",
+  "version": "1.0.0",
+  "description": "Azure Functions microservice for managing student device catalogue",
+  "main": "dist/src/functions/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "clean": "rimraf dist",
+    "prestart": "npm run clean && npm run build",
+    "start": "func start",
+    "seed": "npm run build && node dist/src/seed/seed-device-repo.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.6.0",
+    "@azure/functions": "^4.0.0",
+    "@azure/identity": "^4.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "azure-functions-core-tools": "^4.x",
+    "rimraf": "^5.0.0",
+    "typescript": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
