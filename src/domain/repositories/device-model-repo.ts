@@ -1,4 +1,4 @@
-import { DeviceModel, DeviceCategory } from './device-model';
+import { DeviceModel, DeviceCategory } from '../entities/device-model';
 
 /**
  * Repository interface for DeviceModel persistence operations.

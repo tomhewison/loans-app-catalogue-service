@@ -1,4 +1,4 @@
-import { Device, DeviceStatus } from './device';
+import { Device, DeviceStatus } from '../entities/device';
 
 /**
  * Repository interface for Device persistence operations.
