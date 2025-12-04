@@ -17,7 +17,8 @@ type DeviceModelDocument = {
   description: string;
   specifications: Record<string, string>;
   imageUrl?: string;
-  updatedAt: string; // ISO string
+  featured?: boolean;
+  updatedAt?: string; // ISO string (optional for backward compatibility)
   partitionKey?: string; // if using a custom partition key
 };
 
@@ -42,7 +43,7 @@ export class CosmosDeviceModelRepo implements DeviceModelRepo {
       // If item(id, id) fails due to partition, fallback to query by id
       if (this.isNotFound(error)) return null;
       try {
-        const query: SqlQuerySpec = { query: 'SELECT TOP 1 c FROM c WHERE c.id = @id', parameters: [{ name: '@id', value: id }] };
+        const query: SqlQuerySpec = { query: 'SELECT TOP 1 * FROM c WHERE c.id = @id', parameters: [{ name: '@id', value: id }] };
         const { resources } = await this.container.items.query<DeviceModelDocument>(query).fetchAll();
         if (!resources || resources.length === 0) return null;
         return this.mapToDomain(resources[0]);
@@ -54,9 +55,27 @@ export class CosmosDeviceModelRepo implements DeviceModelRepo {
 
   public async list(): Promise<DeviceModel[]> {
     try {
-      const query: SqlQuerySpec = { query: 'SELECT c FROM c' };
+      const query: SqlQuerySpec = { query: 'SELECT * FROM c' };
       const { resources } = await this.container.items.query<DeviceModelDocument>(query).fetchAll();
-      return (resources ?? []).map((doc) => this.mapToDomain(doc));
+      
+      if (!resources || resources.length === 0) {
+        return [];
+      }
+
+      // Filter out any null/undefined documents and log warnings
+      const validResources = resources.filter((doc, index) => {
+        if (!doc) {
+          console.warn(`Skipping null document at index ${index}`);
+          return false;
+        }
+        if (!doc.id) {
+          console.error(`Document missing id field at index ${index}:`, JSON.stringify(doc, null, 2));
+          return false;
+        }
+        return true;
+      });
+
+      return validResources.map((doc) => this.mapToDomain(doc));
     } catch (error) {
       throw this.wrapError('Failed to list DeviceModels', error);
     }
@@ -65,7 +84,7 @@ export class CosmosDeviceModelRepo implements DeviceModelRepo {
   public async listByCategory(category: DeviceCategory): Promise<DeviceModel[]> {
     try {
       const query: SqlQuerySpec = {
-        query: 'SELECT c FROM c WHERE c.category = @category',
+        query: 'SELECT * FROM c WHERE c.category = @category',
         parameters: [{ name: '@category', value: category }],
       };
       const { resources } = await this.container.items.query<DeviceModelDocument>(query).fetchAll();
@@ -109,14 +128,46 @@ export class CosmosDeviceModelRepo implements DeviceModelRepo {
       description: model.description,
       specifications: model.specifications,
       imageUrl: model.imageUrl,
+      featured: model.featured,
       updatedAt: model.updatedAt.toISOString(),
     };
   }
 
   private mapToDomain(document: DeviceModelDocument): DeviceModel {
-    const updatedAt = new Date(document.updatedAt);
-    if (Number.isNaN(updatedAt.getTime())) {
-      throw new Error(`Invalid updatedAt value from Cosmos DB: ${document.updatedAt}`);
+    // Log the document structure if id is missing for debugging
+    if (!document || typeof document !== 'object') {
+      console.error('Invalid document received:', document);
+      throw new Error(`Invalid document structure: ${JSON.stringify(document)}`);
+    }
+
+    // Validate required fields with detailed error messages
+    if (!document.id) {
+      console.error('Document missing id field:', JSON.stringify(document, null, 2));
+      throw new Error(`DeviceModel document missing required field: id. Document keys: ${Object.keys(document).join(', ')}`);
+    }
+    if (!document.brand) {
+      throw new Error(`DeviceModel document missing required field: brand (id: ${document.id})`);
+    }
+    if (!document.model) {
+      throw new Error(`DeviceModel document missing required field: model (id: ${document.id})`);
+    }
+    if (!document.category) {
+      throw new Error(`DeviceModel document missing required field: category (id: ${document.id})`);
+    }
+    if (!document.description) {
+      throw new Error(`DeviceModel document missing required field: description (id: ${document.id})`);
+    }
+
+    // Handle missing or undefined updatedAt - use current date as fallback
+    let updatedAt: Date;
+    if (!document.updatedAt || document.updatedAt === undefined) {
+      // If updatedAt is missing, use current date (for old data)
+      updatedAt = new Date();
+    } else {
+      updatedAt = new Date(document.updatedAt);
+      if (Number.isNaN(updatedAt.getTime())) {
+        throw new Error(`Invalid updatedAt value from Cosmos DB: ${document.updatedAt} (id: ${document.id})`);
+      }
     }
 
     return {
@@ -127,6 +178,7 @@ export class CosmosDeviceModelRepo implements DeviceModelRepo {
       description: document.description,
       specifications: document.specifications ?? {},
       imageUrl: document.imageUrl,
+      featured: document.featured ?? false,
       updatedAt,
     };
   }

@@ -1,9 +1,8 @@
 {
   "name": "DevOps Starter Kit",
   "image": "ghcr.io/tpdavison/devops-labs:latest",
-
   "features": {},
-
+  "postCreateCommand": "npm install",
   "customizations": {
     "vscode": {
       "extensions": [

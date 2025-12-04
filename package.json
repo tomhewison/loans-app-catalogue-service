@@ -2,28 +2,34 @@
   "name": "device-catalogue-service",
   "version": "1.0.0",
   "description": "Azure Functions microservice for managing student device catalogue",
-  "main": "dist/src/functions/index.js",
+  "main": "dist/src/functions/*.js",
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
     "clean": "rimraf dist",
     "prestart": "npm run clean && npm run build",
     "start": "func start",
-    "seed": "npm run build && node dist/src/seed/seed-device-repo.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No tests yet...\"",
+    "seed": "npm run build && node dist/src/seed/seed-all.js",
+    "seed:models": "npm run build && node dist/src/seed/seed-device-models.js",
+    "seed:devices": "npm run build && node dist/src/seed/seed-devices.js",
+    "wipe": "npm run build && node dist/src/seed/wipe-db.js",
+    "reset": "npm run wipe && npm run seed",
+    "inspect": "npm run build && node dist/src/seed/inspect-db.js"
   },
   "dependencies": {
     "@azure/cosmos": "^4.7.0",
+    "@azure/eventgrid": "^5.12.0",
     "@azure/functions": "^4.0.0",
-    "@azure/identity": "^4.13.0"
+    "@azure/identity": "^4.13.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0"
   },
   "devDependencies": {
-    "@types/node": "^18.0.0",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "18.x",
     "azure-functions-core-tools": "^4.x",
     "rimraf": "^5.0.0",
     "typescript": "^4.0.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }

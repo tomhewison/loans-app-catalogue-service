@@ -6,6 +6,7 @@ export type DeviceModel = {
   description: string;
   specifications: Record<string, string>;
   imageUrl?: string;
+  featured?: boolean;
   updatedAt: Date;
 };
 
@@ -28,6 +29,7 @@ export type CreateDeviceModelParams = {
   description: string;
   specifications?: Record<string, string>;
   imageUrl?: string;
+  featured?: boolean;
 };
 
 export type UpdateDeviceModelParams = Partial<Omit<CreateDeviceModelParams, 'id'>>;
@@ -67,6 +69,10 @@ const validateDeviceModel = (params: CreateDeviceModelParams): void => {
   if (params.imageUrl && (typeof params.imageUrl !== 'string' || params.imageUrl.trim() === '')) {
     throw new DeviceModelError('imageUrl', 'DeviceModel imageUrl must be a non-empty string when provided.');
   }
+  
+  if (params.featured !== undefined && typeof params.featured !== 'boolean') {
+    throw new DeviceModelError('featured', 'DeviceModel featured must be a boolean when provided.');
+  }
 };
 
 export function createDeviceModel(params: CreateDeviceModelParams): DeviceModel {
@@ -80,6 +86,7 @@ export function createDeviceModel(params: CreateDeviceModelParams): DeviceModel 
     description: params.description.trim(),
     specifications: params.specifications || {},
     imageUrl: params.imageUrl?.trim(),
+    featured: params.featured ?? false,
     updatedAt: new Date(),
   };
 }
@@ -93,6 +100,7 @@ export function updateDeviceModel(existing: DeviceModel, params: UpdateDeviceMod
     description: params.description ?? existing.description,
     specifications: params.specifications ?? existing.specifications,
     imageUrl: params.imageUrl ?? existing.imageUrl,
+    featured: params.featured ?? existing.featured,
   };
   
   validateDeviceModel(updatedParams);

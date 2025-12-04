@@ -3,6 +3,11 @@ export type Device = {
   deviceModelId: string;
   serialNumber: string;
   assetId: string;
+  /**
+   * Device status/availability is determined by the device availability microservice.
+   * This field may be cached/synced locally but the availability service is the source of truth.
+   * Use DeviceAvailabilityClient to fetch the current status.
+   */
   status: DeviceStatus;
   condition: string;
   notes?: string;

@@ -1,26 +1,26 @@
-import { DeviceModelRepo } from '../domain/repositories/device-model-repo';
+import { DeviceRepo } from '../domain/repositories/device-repo';
 import { EventPublisher } from '../domain/repositories/event-publisher';
 
-export type DeleteDeviceModelDeps = {
-  deviceModelRepo: DeviceModelRepo;
+export type DeleteDeviceDeps = {
+  deviceRepo: DeviceRepo;
   eventPublisher: EventPublisher;
 };
 
-export type DeleteDeviceModelResult = {
+export type DeleteDeviceResult = {
   success: boolean;
   error?: string;
 };
 
-export async function deleteDeviceModel(
-  deps: DeleteDeviceModelDeps,
+export async function deleteDevice(
+  deps: DeleteDeviceDeps,
   id: string
-): Promise<DeleteDeviceModelResult> {
+): Promise<DeleteDeviceResult> {
   try {
-    await deps.deviceModelRepo.delete(id);
+    await deps.deviceRepo.delete(id);
     
     await deps.eventPublisher.publish(
       'Catalogue',
-      'Catalogue.DeviceModel.Deleted',
+      'Catalogue.Device.Deleted',
       id,
       { id }
     );
@@ -31,5 +31,4 @@ export async function deleteDeviceModel(
     return { success: false, error: message };
   }
 }
-
 
