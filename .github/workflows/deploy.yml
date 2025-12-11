@@ -58,12 +58,9 @@ jobs:
       - name: Build TypeScript
         run: npm run build
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Install production dependencies
+        run: |
+          npm ci --production
 
       - name: Set deployment variables
         id: vars
@@ -74,43 +71,42 @@ jobs:
             echo "environment=dev" >> $GITHUB_OUTPUT
           fi
 
-      - name: Get Function App Name
-        id: functionApp
+      - name: Create deployment package
         run: |
-          # Use GitHub Environment Variable if set, otherwise construct it
-          if [ -n "${{ vars.AZURE_FUNCTION_APP_NAME }}" ]; then
-            FUNCTION_APP_NAME="${{ vars.AZURE_FUNCTION_APP_NAME }}"
-            RESOURCE_GROUP="device-loan-${{ steps.vars.outputs.environment }}-th24-rg"
-          else
-            RESOURCE_GROUP="device-loan-${{ steps.vars.outputs.environment }}-th24-rg"
-            FUNCTION_APP_NAME="device-loan-${{ steps.vars.outputs.environment }}-th24-${{ env.SERVICE_NAME }}"
-          fi
-          
-          # Verify function app exists
-          echo "Verifying $FUNCTION_APP_NAME in $RESOURCE_GROUP..."
-          az functionapp show \
-            --name "$FUNCTION_APP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --query name -o tsv || exit 1
-          
-          echo "FUNCTION_APP_NAME=$FUNCTION_APP_NAME" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=$RESOURCE_GROUP" >> $GITHUB_ENV
+          zip -r functionapp.zip \
+            dist/ \
+            host.json \
+            package.json \
+            package-lock.json \
+            node_modules/
 
-      - name: Install Azure Functions Core Tools
-        run: |
-          npm install -g azure-functions-core-tools@4
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy Function App
-        run: |
-          func azure functionapp publish "${{ env.FUNCTION_APP_NAME }}"
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            RESOURCE_GROUP="device-loan-${{ steps.vars.outputs.environment }}-th24-rg"
+            FUNCTION_APP_NAME="device-loan-${{ steps.vars.outputs.environment }}-th24-${{ env.SERVICE_NAME }}"
+            
+            echo "Deploying to $FUNCTION_APP_NAME in $RESOURCE_GROUP..."
+            az functionapp deployment source config-zip \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$FUNCTION_APP_NAME" \
+              --src functionapp.zip
 
       - name: Display Deployment Summary
         run: |
           echo "## 🚀 Catalogue Service Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** ${{ steps.vars.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Function App:** ${{ env.FUNCTION_APP_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Resource Group:** ${{ env.RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Function App:** device-loan-${{ steps.vars.outputs.environment }}-th24-${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** device-loan-${{ steps.vars.outputs.environment }}-th24-rg" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Function code deployed successfully!" >> $GITHUB_STEP_SUMMARY
 
