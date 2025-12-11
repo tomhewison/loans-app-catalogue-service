@@ -98,11 +98,11 @@ jobs:
 
       - name: Install Azure Functions Core Tools
         run: |
-          npm install -g azure-functions-core-tools@4 --unsafe-perm true
+          npm install -g azure-functions-core-tools@4
 
       - name: Deploy Function App
         run: |
-          func azure functionapp publish "${{ env.FUNCTION_APP_NAME }}" --python false
+          func azure functionapp publish "${{ env.FUNCTION_APP_NAME }}"
 
       - name: Display Deployment Summary
         run: |
