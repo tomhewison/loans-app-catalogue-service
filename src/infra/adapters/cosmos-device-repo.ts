@@ -1,4 +1,5 @@
 import { CosmosClient, Database, Container, ItemResponse, SqlQuerySpec } from '@azure/cosmos';
+import { DefaultAzureCredential } from '@azure/identity';
 import { Device, DeviceStatus } from '../../domain/entities/device';
 import { DeviceRepo } from '../../domain/repositories/device-repo';
 
@@ -28,7 +29,11 @@ export class CosmosDeviceRepo implements DeviceRepo {
   private readonly container: Container;
 
   constructor(private readonly options: CosmosDeviceRepoOptions) {
-    this.client = new CosmosClient({ endpoint: options.endpoint, key: options.key });
+    if (options.key) {
+      this.client = new CosmosClient({ endpoint: options.endpoint, key: options.key });
+    } else {
+      this.client = new CosmosClient({ endpoint: options.endpoint, aadCredentials: new DefaultAzureCredential() });
+    }
     this.database = this.client.database(options.databaseId);
     this.container = this.database.container(options.containerId);
   }
