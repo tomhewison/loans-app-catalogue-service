@@ -91,8 +91,8 @@ jobs:
         uses: azure/CLI@v1
         with:
           inlineScript: |
-            RESOURCE_GROUP="device-loan-${{ steps.vars.outputs.environment }}-th24-rg"
-            FUNCTION_APP_NAME="device-loan-${{ steps.vars.outputs.environment }}-th24-${{ env.SERVICE_NAME }}"
+            RESOURCE_GROUP="device-loan-${{ steps.vars.outputs.environment }}-th04-rg"
+            FUNCTION_APP_NAME="device-loan-${{ steps.vars.outputs.environment }}-th04-${{ env.SERVICE_NAME }}"
             
             echo "Deploying to $FUNCTION_APP_NAME in $RESOURCE_GROUP..."
             az functionapp deployment source config-zip \
@@ -105,8 +105,8 @@ jobs:
           echo "## 🚀 Catalogue Service Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** ${{ steps.vars.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Function App:** device-loan-${{ steps.vars.outputs.environment }}-th24-${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Resource Group:** device-loan-${{ steps.vars.outputs.environment }}-th24-rg" >> $GITHUB_STEP_SUMMARY
+          echo "**Function App:** device-loan-${{ steps.vars.outputs.environment }}-th04-${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** device-loan-${{ steps.vars.outputs.environment }}-th04-rg" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Function code deployed successfully!" >> $GITHUB_STEP_SUMMARY
 
