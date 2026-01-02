@@ -7,6 +7,8 @@ import { saveDeviceModel } from '../app/save-device-model';
 import { deleteDeviceModel } from '../app/delete-device-model';
 import { createDeviceModel, updateDeviceModel, DeviceModel, DeviceCategory } from '../domain/entities/device-model';
 import { listDeviceModelsWithFilters } from '../app/list-device-models-with-filters';
+import { listDevicesByDeviceModelId } from '../app/list-devices-by-device-model-id';
+import { DeviceStatus } from '../domain/entities/device';
 import { addCorsHeaders } from '../infra/middleware/cors';
 import { requireAuth, requireStaff } from '../infra/middleware/auth0-middleware';
 
@@ -356,6 +358,101 @@ async function handleDeleteDeviceModel(request: HttpRequest): Promise<HttpRespon
   }, origin);
 }
 
+/**
+ * GET /api/device-models/{id}/availability - Check device availability (authenticated)
+ * Returns available count and an available device ID for reservation
+ */
+async function handleGetDeviceModelAvailability(request: HttpRequest): Promise<HttpResponseInit> {
+  const origin = request.headers.get('origin');
+  const id = request.params.id;
+
+  // Require authentication - users need to be logged in to see availability
+  const authResult = await requireAuth(request);
+  if (!authResult.valid) {
+    return addCorsHeaders({
+      status: 401,
+      jsonBody: {
+        success: false,
+        message: 'Authentication required to check availability',
+        error: authResult.error,
+      },
+    }, origin);
+  }
+
+  if (!id) {
+    return addCorsHeaders({
+      status: 400,
+      jsonBody: {
+        success: false,
+        message: 'Device model ID is required',
+      },
+    }, origin);
+  }
+
+  try {
+    // Check if device model exists
+    const modelResult = await getDeviceModel({
+      deviceModelRepo: getDeviceModelRepo(),
+    }, id);
+
+    if (!modelResult.success || !modelResult.data) {
+      return addCorsHeaders({
+        status: 404,
+        jsonBody: {
+          success: false,
+          message: 'Device model not found',
+        },
+      }, origin);
+    }
+
+    // Get all devices for this model
+    const devicesResult = await listDevicesByDeviceModelId({
+      deviceRepo: getDeviceRepo(),
+    }, id);
+
+    if (!devicesResult.success) {
+      return addCorsHeaders({
+        status: 500,
+        jsonBody: {
+          success: false,
+          message: 'Failed to check availability',
+          error: devicesResult.error,
+        },
+      }, origin);
+    }
+
+    // Filter to available devices only
+    const availableDevices = (devicesResult.data || []).filter(
+      device => device.status === DeviceStatus.Available
+    );
+
+    const totalDevices = devicesResult.data?.length || 0;
+    const availableCount = availableDevices.length;
+    const firstAvailableDeviceId = availableDevices.length > 0 ? availableDevices[0].id : undefined;
+
+    return addCorsHeaders({
+      status: 200,
+      jsonBody: {
+        deviceModelId: id,
+        totalDevices,
+        availableCount,
+        canReserve: availableCount > 0,
+        availableDeviceId: firstAvailableDeviceId,
+      },
+    }, origin);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return addCorsHeaders({
+      status: 500,
+      jsonBody: {
+        success: false,
+        message: 'Failed to check availability',
+        error: message,
+      },
+    }, origin);
+  }
+}
+
 // GET /api/device-models - List device models with filters (public)
 app.http('listDeviceModelsHttp', {
   methods: ['GET'],
@@ -394,4 +491,12 @@ app.http('deleteDeviceModelHttp', {
   authLevel: 'anonymous',
   route: 'device-models/{id}',
   handler: handleDeleteDeviceModel,
+});
+
+// GET /api/device-models/{id}/availability - Check availability (authenticated)
+app.http('getDeviceModelAvailabilityHttp', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'device-models/{id}/availability',
+  handler: handleGetDeviceModelAvailability,
 });
