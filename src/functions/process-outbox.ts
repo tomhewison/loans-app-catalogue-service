@@ -44,7 +44,7 @@ export async function processOutbox(myTimer: Timer, context: InvocationContext):
 }
 
 app.timer('processOutbox', {
-  schedule: '0 */1 * * * *', // Run every 1 minute
+  schedule: '0 */5 * * * *', // Run every 5 minutes
   handler: processOutbox,
 });
 
