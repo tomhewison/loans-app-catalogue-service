@@ -1,6 +1,7 @@
 import { HttpRequest } from '@azure/functions';
 import * as jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
+import { logger } from '../logging/logger';
 
 export type Auth0User = {
   sub: string; // User ID
@@ -21,6 +22,7 @@ export type Auth0ValidationResult = {
 function getAuth0Domain(): string {
   const domain = process.env.AUTH0_DOMAIN;
   if (!domain) {
+    logger.error('AUTH0_DOMAIN environment variable is required');
     throw new Error('AUTH0_DOMAIN environment variable is required');
   }
   // Remove trailing slash if present
@@ -33,6 +35,7 @@ function getAuth0Domain(): string {
 function getAuth0Audience(): string {
   const audience = process.env.AUTH0_AUDIENCE;
   if (!audience) {
+    logger.error('AUTH0_AUDIENCE environment variable is required');
     throw new Error('AUTH0_AUDIENCE environment variable is required');
   }
   return audience;
@@ -43,6 +46,8 @@ function getAuth0Audience(): string {
  */
 function createJwksClient() {
   const domain = getAuth0Domain();
+  logger.debug('Creating JWKS client', { domain });
+  
   return jwksClient({
     jwksUri: `https://${domain}/.well-known/jwks.json`,
     cache: true,
@@ -56,9 +61,23 @@ function createJwksClient() {
  * Gets the signing key from Auth0 JWKS endpoint
  */
 async function getSigningKey(kid: string): Promise<string> {
-  const client = createJwksClient();
-  const key = await client.getSigningKey(kid);
-  return key.getPublicKey();
+  const startTime = Date.now();
+  
+  try {
+    const client = createJwksClient();
+    const key = await client.getSigningKey(kid);
+    const publicKey = key.getPublicKey();
+    
+    logger.debug('Retrieved signing key from JWKS', {
+      kid,
+      durationMs: Date.now() - startTime,
+    });
+    
+    return publicKey;
+  } catch (error) {
+    logger.error('Failed to retrieve signing key from JWKS', error as Error, { kid });
+    throw error;
+  }
 }
 
 /**
@@ -80,6 +99,7 @@ export async function validateAuth0Token(request: HttpRequest): Promise<Auth0Val
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    logger.debug('Missing or invalid Authorization header');
     return {
       valid: false,
       error: 'Missing or invalid Authorization header',
@@ -89,6 +109,7 @@ export async function validateAuth0Token(request: HttpRequest): Promise<Auth0Val
   const token = authHeader.substring(7);
   
   if (!token || token.length === 0) {
+    logger.warn('Empty token provided');
     return {
       valid: false,
       error: 'Invalid token',
@@ -101,18 +122,28 @@ export async function validateAuth0Token(request: HttpRequest): Promise<Auth0Val
     const audience = getAuth0Audience();
     const issuer = `https://${domain}/`;
 
+    logger.debug('Validating Auth0 token', {
+      issuer,
+      audience,
+      tokenLength: token.length,
+    });
+
     // Decode token to get kid (key ID) without verification
     const decoded = jwt.decode(token, { complete: true });
     
     if (!decoded || typeof decoded === 'string' || !decoded.header || !decoded.header.kid) {
+      logger.warn('Invalid token format - could not decode');
       return {
         valid: false,
         error: 'Invalid token format',
       };
     }
 
+    const kid = decoded.header.kid;
+    logger.debug('Token decoded, fetching signing key', { kid });
+
     // Get the signing key from Auth0 JWKS endpoint
-    const signingKey = await getSigningKey(decoded.header.kid);
+    const signingKey = await getSigningKey(kid);
 
     // Verify and decode the token
     const verified = jwt.verify(token, signingKey, {
@@ -130,11 +161,17 @@ export async function validateAuth0Token(request: HttpRequest): Promise<Auth0Val
     };
 
     if (!user.sub) {
+      logger.warn('Token missing user identifier (sub)');
       return {
         valid: false,
         error: 'Token missing user identifier (sub)',
       };
     }
+
+    logger.debug('Auth0 token validated successfully', {
+      userId: user.sub,
+      roles: user.roles?.join(','),
+    });
 
     return {
       valid: true,
@@ -142,6 +179,9 @@ export async function validateAuth0Token(request: HttpRequest): Promise<Auth0Val
     };
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
+      logger.debug('Token has expired', {
+        expiredAt: error.expiredAt?.toISOString(),
+      });
       return {
         valid: false,
         error: 'Token has expired',
@@ -149,6 +189,9 @@ export async function validateAuth0Token(request: HttpRequest): Promise<Auth0Val
     }
     
     if (error instanceof jwt.JsonWebTokenError) {
+      logger.debug('Token validation failed', {
+        errorMessage: error.message,
+      });
       return {
         valid: false,
         error: `Token validation failed: ${error.message}`,
@@ -157,12 +200,14 @@ export async function validateAuth0Token(request: HttpRequest): Promise<Auth0Val
 
     // Handle JWKS errors
     if (error instanceof Error) {
+      logger.warn('Authentication error', { errorMessage: error.message });
       return {
         valid: false,
         error: `Authentication error: ${error.message}`,
       };
     }
 
+    logger.error('Unknown authentication error', new Error('Unknown error'));
     return {
       valid: false,
       error: 'Unknown authentication error',
@@ -242,12 +287,16 @@ export async function requireAuth(request: HttpRequest): Promise<Auth0Validation
     const validation = await validateAuth0Token(request);
     
     if (!validation.valid) {
+      logger.debug('Authentication required but validation failed', {
+        error: validation.error,
+      });
       return validation;
     }
     
     return validation;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    logger.error('Authentication configuration error', error as Error);
     return {
       valid: false,
       error: `Authentication configuration error: ${message}`,
@@ -263,6 +312,9 @@ export async function requireStaff(request: HttpRequest): Promise<Auth0Validatio
     const validation = await validateAuth0Token(request);
     
     if (!validation.valid || !validation.user) {
+      logger.debug('Staff access denied - authentication failed', {
+        error: validation.error,
+      });
       return {
         valid: false,
         error: validation.error || 'Authentication required',
@@ -270,6 +322,9 @@ export async function requireStaff(request: HttpRequest): Promise<Auth0Validatio
     }
     
     if (!hasRole(validation.user, 'staff')) {
+      logger.debug('Staff access denied - insufficient role', {
+        userId: validation.user.sub,
+      });
       return {
         valid: false,
         error: 'Staff role required',
@@ -279,6 +334,7 @@ export async function requireStaff(request: HttpRequest): Promise<Auth0Validatio
     return validation;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    logger.error('Authentication configuration error', error as Error);
     return {
       valid: false,
       error: `Authentication configuration error: ${message}`,
@@ -297,6 +353,10 @@ export async function requirePermission(
     const validation = await validateAuth0Token(request);
     
     if (!validation.valid || !validation.user) {
+      logger.debug('Permission check failed - authentication failed', {
+        error: validation.error,
+        requiredPermission,
+      });
       return {
         valid: false,
         error: validation.error || 'Authentication required',
@@ -304,6 +364,10 @@ export async function requirePermission(
     }
     
     if (!hasPermission(validation.user, requiredPermission)) {
+      logger.debug('Permission denied', {
+        userId: validation.user.sub,
+        requiredPermission,
+      });
       return {
         valid: false,
         error: `Permission required: ${requiredPermission}`,
@@ -313,6 +377,7 @@ export async function requirePermission(
     return validation;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    logger.error('Authentication configuration error', error as Error);
     return {
       valid: false,
       error: `Authentication configuration error: ${message}`,
