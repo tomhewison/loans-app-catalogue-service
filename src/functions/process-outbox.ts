@@ -5,6 +5,12 @@ export async function processOutbox(myTimer: Timer, context: InvocationContext):
   const outboxRepo = getOutboxRepo();
   const eventGridPublisher = getEventGridPublisher(); // This is the real publisher
 
+  // Check if EventGrid is configured
+  const isEventGridConfigured = process.env.EVENT_GRID_TOPIC_ENDPOINT && process.env.EVENT_GRID_TOPIC_KEY;
+  if (!isEventGridConfigured) {
+    context.log('EventGrid not configured - outbox messages will accumulate but not be published');
+  }
+
   try {
     const messages = await outboxRepo.listUnprocessed(20); // Process 20 at a time
     
@@ -23,8 +29,9 @@ export async function processOutbox(myTimer: Timer, context: InvocationContext):
           message.data,
           message.dataVersion
         );
-        
+
         await outboxRepo.markAsProcessed(message.id);
+        context.log(`Successfully processed outbox message ${message.id} (${message.eventType})`);
       } catch (error) {
         context.error(`Failed to process outbox message ${message.id}:`, error);
         const errorMessage = error instanceof Error ? error.message : String(error);

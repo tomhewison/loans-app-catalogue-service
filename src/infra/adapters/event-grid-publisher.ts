@@ -9,7 +9,7 @@ export type EventGridPublisherOptions = {
 };
 
 export class EventGridPublisher implements EventPublisher {
-  private readonly client: EventGridPublisherClient<any>;
+  private readonly client: EventGridPublisherClient<any> | null;
   private readonly log: Logger;
   private readonly isConfigured: boolean;
 
@@ -25,21 +25,21 @@ export class EventGridPublisher implements EventPublisher {
         hasEndpoint: !!options.topicEndpoint,
         hasKey: !!options.key,
       });
+      this.client = null;
     } else {
       this.log.info('EventGridPublisher initialized', {
         topicEndpoint: options.topicEndpoint,
       });
+      this.client = new EventGridPublisherClient(
+        options.topicEndpoint,
+        'EventGrid',
+        new AzureKeyCredential(options.key)
+      );
     }
-
-    this.client = new EventGridPublisherClient(
-      options.topicEndpoint || '',
-      'EventGrid',
-      new AzureKeyCredential(options.key || '')
-    );
   }
 
   public async publish(topic: string, eventType: string, subject: string, data: any, dataVersion: string = '1.0'): Promise<void> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured || !this.client) {
       this.log.debug('Skipping event publish - EventGrid not configured', { eventType, subject });
       return;
     }
@@ -83,7 +83,7 @@ export class EventGridPublisher implements EventPublisher {
   }
 
   public async publishBatch(events: { topic: string; eventType: string; subject: string; data: any; dataVersion?: string }[]): Promise<void> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured || !this.client) {
       this.log.debug('Skipping batch event publish - EventGrid not configured', { eventCount: events.length });
       return;
     }
