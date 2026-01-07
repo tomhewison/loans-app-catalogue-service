@@ -17,8 +17,8 @@ let cachedOutboxRepo: OutboxRepo | undefined;
 export const getDeviceModelRepo = (): DeviceModelRepo => {
   if (!cachedDeviceModelRepo) {
     const endpoint = process.env.COSMOS_ENDPOINT || '';
-    const databaseId = process.env.COSMOS_DATABASE_ID || 'catalogue-db';
-    const containerId = process.env.COSMOS_CONTAINER_ID || 'device-models';
+    const databaseId = process.env.COSMOS_CATALOGUE_DATABASE_ID || 'catalogue-db';
+    const containerId = process.env.COSMOS_CATALOGUE_DEVICE_MODELS_CONTAINER_ID || 'device-models';
     const key = process.env.COSMOS_KEY;
 
     if (!endpoint) {
@@ -38,8 +38,8 @@ export const getDeviceModelRepo = (): DeviceModelRepo => {
 export const getDeviceRepo = (): DeviceRepo => {
   if (!cachedDeviceRepo) {
     const endpoint = process.env.COSMOS_ENDPOINT || '';
-    const databaseId = process.env.COSMOS_DATABASE_ID || 'catalogue-db';
-    const containerId = process.env.COSMOS_DEVICES_CONTAINER_ID || 'devices';
+    const databaseId = process.env.COSMOS_CATALOGUE_DATABASE_ID || 'catalogue-db';
+    const containerId = process.env.COSMOS_CATALOGUE_DEVICES_CONTAINER_ID || 'devices';
     const key = process.env.COSMOS_KEY;
 
     if (!endpoint) {
@@ -59,7 +59,7 @@ export const getDeviceRepo = (): DeviceRepo => {
 export const getOutboxRepo = (): OutboxRepo => {
   if (!cachedOutboxRepo) {
     const endpoint = process.env.COSMOS_ENDPOINT || '';
-    const databaseId = process.env.COSMOS_DATABASE_ID || 'catalogue-db';
+    const databaseId = process.env.COSMOS_CATALOGUE_DATABASE_ID || 'catalogue-db';
     const containerId = process.env.COSMOS_OUTBOX_CONTAINER_ID || 'outbox';
     const key = process.env.COSMOS_KEY;
 
@@ -82,7 +82,7 @@ export const getEventGridPublisher = (): EventPublisher => {
   if (!cachedEventGridPublisher) {
     const topicEndpoint = process.env.EVENT_GRID_TOPIC_ENDPOINT || '';
     const key = process.env.EVENT_GRID_TOPIC_KEY || '';
-    
+
     cachedEventGridPublisher = new EventGridPublisher({
       topicEndpoint,
       key

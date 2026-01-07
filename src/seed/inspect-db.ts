@@ -8,13 +8,13 @@ import { CosmosClient } from '@azure/cosmos';
  */
 async function inspectDatabase() {
   console.log('🔍 Inspecting Cosmos DB contents...\n');
-  
+
   try {
     const endpoint = process.env.COSMOS_ENDPOINT || '';
     const key = process.env.COSMOS_KEY;
-    const databaseId = process.env.COSMOS_DATABASE_ID || 'catalogue-db';
-    const containerId = process.env.COSMOS_CONTAINER_ID || 'device-models';
-    
+    const databaseId = process.env.COSMOS_CATALOGUE_DATABASE_ID || 'catalogue-db';
+    const containerId = process.env.COSMOS_CATALOGUE_DEVICE_MODELS_CONTAINER_ID || 'device-models';
+
     if (!endpoint) {
       throw new Error('COSMOS_ENDPOINT environment variable is required');
     }
